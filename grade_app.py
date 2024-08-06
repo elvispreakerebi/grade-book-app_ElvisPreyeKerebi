@@ -1,28 +1,42 @@
 #!/usr/bin/python3
 
+import pickle
+
 class Student:
     def __init__(self, email, names):
         self.email = email
         self.names = names
         self.courses_registered = []
-        self.gpa = 0.0
         self.total_marks = 0.0
+        self.GPA = 0.0
 
-
-    def calculate_GPA(self):
+    def calculate_marks_and_grade(self):
         if not self.courses_registered:
-            return 0.0
-        total_grades = sum(course['grade'] for course in self.courses_registered)
-        total_credits = sum(course['credits'] for course in self.courses_registered)
-        self.gpa = total_grades / total_credits
-        return self.gpa
+            self.total_marks = 0.0
+            self.GPA = 0.0
+        else:
+            total_points = sum(course.credits * marks for course, marks in self.courses_registered)
+            total_credits = sum(course.credits for course, marks in self.courses_registered)
+            self.total_marks = total_points / total_credits if total_credits > 0 else 0.0
+            self.GPA = self.calculate_gpa_from_marks(self.total_marks)
 
+    def calculate_gpa_from_marks(self, marks):
+        if marks >= 80:
+            return 4.0  # A
+        elif marks >= 70:
+            return 3.0  # B
+        elif marks >= 60:
+            return 2.0  # C
+        elif marks >= 40:
+            return 1.0  # D
+        elif marks >= 30:
+            return 0.5  # E
+        else:
+            return 0.0  # F
 
-    def register_for_course(self, course_name, trimester, credits, grade):
-        self.courses_registered.append({'name': course_name, 'trimester': trimester, 'credits': credits, 'grade': grade})
-        self.calculate_GPA()
-        self.total_marks += grade
-
+    def register_for_course(self, course, marks):
+        self.courses_registered.append((course, marks))
+        self.calculate_marks_and_grade()
 
 class Course:
     def __init__(self, name, trimester, credits):
@@ -30,91 +44,77 @@ class Course:
         self.trimester = trimester
         self.credits = credits
 
-
 class GradeBook:
     def __init__(self):
         self.student_list = []
         self.course_list = []
 
-
-    def add_student(self, email, names):
-        student = Student(email, names)
+    def add_student(self, student):
         self.student_list.append(student)
-        print(f"Student {names} added successfully!")
 
-
-    def add_course(self, name, trimester, credits):
-        course = Course(name, trimester, credits)
+    def add_course(self, course):
         self.course_list.append(course)
-        print(f"Course {name} added successfully!")
 
-
-    def register_student_for_course(self, student_email, course_name, trimester, grade):
+    def register_student_for_course(self, student_email, course_name, marks):
         student = next((s for s in self.student_list if s.email == student_email), None)
-        course = next((c for c in self.course_list if c.name == course_name and c.trimester == trimester), None)
+        course = next((c for c in self.course_list if c.name == course_name), None)
         if student and course:
-            student.register_for_course(course.name, course.trimester, course.credits, grade)
-            print("Student registered for the course successfully!")
+            student.register_for_course(course, marks)
+            print("The student has been registered successfully.")
         else:
-            print("Student or course not found!")
+            print("Student or Course not found")
 
-
-    def calculate_GPA(self):
-        for student in self.student_list:
-            student.calculate_GPA()
-
+    def remove_student_from_course(self, student_email, course_name):
+        student = next((s for s in self.student_list if s.email == student_email), None)
+        course = next((c for c in self.course_list if c.name == course_name), None)
+        if student and course:
+            student.courses_registered = [(c, m) for c, m in student.courses_registered if c != course]
+            student.calculate_marks_and_grade()
+            print(f"The student has been removed from the course '{course_name}' successfully.")
+        else:
+            print("Student or Course not found")
 
     def calculate_ranking(self):
-        ranked_students = sorted(self.student_list, key=lambda s: s.gpa, reverse=True)
-        for rank, student in enumerate(ranked_students, 1):
-            print(f"{rank}. {student.email}: {student.gpa:.2f}")
+        return sorted(self.student_list, key=lambda s: s.total_marks, reverse=True)
 
-
-    def search_by_grade(self, min_grade, max_grade):
-        filtered_students = [s for s in self.student_list if min_grade <= s.gpa <= max_grade]
-        if filtered_students:
-            print(f"Students with GPA between {min_grade} and {max_grade}:")
-            for student in filtered_students:
-                print(f"{student.names} ({student.email}): {student.gpa:.2f}")
-        else:
-            print(f"No students found with GPA between {min_grade} and {max_grade}")
-
+    def search_by_grade(self, grade):
+        return [student for student in self.student_list if any(self.grade_from_marks(course_grade) == grade for course, course_grade in student.courses_registered)]
 
     def generate_transcript(self, student_email):
         student = next((s for s in self.student_list if s.email == student_email), None)
         if student:
-            print("*" * 60)
-            print(" " * 20 + "ALU STUDENT TRANSCRIPT")
-            print("*" * 60)
-            print(f"Student name:  {student.names}")
-            print(f"Student email: {student.email}")
-            for course in student.courses_registered:
-                print("*" * 60)
-                print(f"Trimester:     {course['trimester']}")
-                print(f"Course name:   {course['name']}")
-                print(f"Total marks:   {course['grade']:.2f}")
-                grade = self.grade_from_marks(course['grade'])
-                print(f"GPA:           {student.gpa:.2f}")
-                print(f"Grade:         {grade}")
-                print("*" * 60)
-                print(f"{student.names} has successfully completed {course['name']}!")
-            print("*" * 60)
+            print("............................................................")
+            print("                    ALU STUDENT TRANSCRIPT")
+            print("............................................................")
+            print(f"Student name: {'.' * (25 - len('Student name: ' + student.names))} {student.names}")
+            print(f"Student email: {'.' * (25 - len('Student email: ' + student.email))} {student.email}")
+            print("............................................................")
+            for course, marks in student.courses_registered:
+                print(f"Trimester: {'.' * (25 - len('Trimester: ' + course.trimester))} {course.trimester}")
+                print(f"Course name: {'.' * (25 - len('Course name: ' + course.name))} {course.name}")
+                print(f"Total marks: {'.' * (25 - len('Total marks: ' + format(student.total_marks, '.2f')))} {student.total_marks:.2f}")
+                print(f"GPA: {'.' * (25 - len('GPA: ' + format(student.GPA, '.2f')))} {student.GPA:.2f}")
+                grade = self.grade_from_marks(marks)
+                print(f"Grade: {'.' * (25 - len('Grade: ' + grade))} {grade}")
+                print("............................................................")
+                print(f"{student.names} has successfully completed {course.name} Course!")
+                print("............................................................")
         else:
-            print("Student not found!")
-
+            print("Student not found")
 
     def grade_from_marks(self, marks):
-        if marks >= 90:
+        if marks >= 80:
             return 'A'
-        elif marks >= 80:
-            return 'B'
         elif marks >= 70:
-            return 'C'
+            return 'B'
         elif marks >= 60:
+            return 'C'
+        elif marks >= 40:
             return 'D'
+        elif marks >= 30:
+            return 'E'
         else:
             return 'F'
-
 
     def display_all_students(self):
         if not self.student_list:
@@ -122,70 +122,97 @@ class GradeBook:
         else:
             print("List Of Registered Students")
             print()
-            print("{:<15} {:<25} {:<12} {:<15} {:<8} {:<12} {:<5} {:<5}".format(
+            print("{:<20} {:<30} {:<12} {:<15} {:<10} {:<12} {:<10} {:<6}".format(
                 "Student Name", "Student Email", "Trimester", "Course", "Credits", "Total Marks", "GPA", "Grade"))
-            print("=" * 104)
+            print("=" * 121)
             for student in self.student_list:
-                for course in student.courses_registered:
-                    grade = self.grade_from_marks(course['grade'])
-                    print("{:<15} {:<25} {:<12} {:<15} {:<8} {:<12.2f} {:<5.2f} {:<5}".format(
-                        student.names, student.email, course['trimester'], course['name'], course['credits'], course['grade'], student.gpa, grade))
+                for course, marks in student.courses_registered:
+                    grade = self.grade_from_marks(marks)
+                    print("{:<20} {:<30} {:<12} {:<15} {:<10} {:<12.2f} {:<10.2f} {:<6}".format(
+                        student.names, student.email, course.trimester, course.name, course.credits, student.total_marks, student.GPA, grade))
 
+    def save_data(self, filename):
+        with open(filename, 'wb') as file:
+            pickle.dump((self.student_list, self.course_list), file)
+        print("Data saved successfully.")
+
+    def load_data(self, filename):
+        try:
+            with open(filename, 'rb') as file:
+                self.student_list, self.course_list = pickle.load(file)
+            print("Data loaded successfully.")
+        except FileNotFoundError:
+            print("No saved data found.")
+        except Exception as e:
+            print(f"An error occurred while loading data: {e}")
 
 def main():
     gradebook = GradeBook()
+    gradebook.load_data('gradebook_data.pkl')
+
     while True:
-        print("\n" + "=" * 30)
-        print("    Welcome to Grade Book")
-        print("=" * 30)
+        print("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        print("    Welcome to Yunis App    ")
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         print("1. Add Student")
         print("2. Add Course")
         print("3. Register Student for Course")
-        print("4. Calculate Ranking")
-        print("5. Search by Grade")
-        print("6. Generate Transcript")
-        print("7. Display All Students")
-        print("8. Exit")
-        print("=" * 30)
+        print("4. Remove Student from Course")  # New option
+        print("5. Calculate Ranking")
+        print("6. Search by Grade")
+        print("7. Generate Transcript")
+        print("8. Display All Students")
+        print("9. Save Data")
+        print("10. Exit")  # Updated choice number
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+
         choice = input("Enter your choice: ")
 
-
-        if choice == "1":
-            email = input("Enter student email: ")
-            names = input("Enter student names: ")
-            gradebook.add_student(email, names)
-        elif choice == "2":
+        if choice == '1':
+            email = input("Enter student's email: ")
+            names = input("Enter student's name: ")
+            student = Student(email, names)
+            gradebook.add_student(student)
+            print("The student has been added successfully.")
+        elif choice == '2':
             name = input("Enter course name: ")
-            trimester = input("Enter course trimester: ")
-            credits = int(input("Enter course credits: "))
-            gradebook.add_course(name, trimester, credits)
-        elif choice == "3":
-            student_email = input("Enter student email: ")
+            trimester = input("Enter trimester: ")
+            credits = float(input("Enter credits: "))
+            course = Course(name, trimester, credits)
+            gradebook.add_course(course)
+            print("The course has been added successfully.")
+        elif choice == '3':
+            student_email = input("Enter student's email: ")
             course_name = input("Enter course name: ")
-            trimester = input("Enter course trimester: ")
-            grade = float(input("Enter grade received: "))
-            gradebook.register_student_for_course(student_email, course_name, trimester, grade)
-        elif choice == "4":
-            gradebook.calculate_ranking()
-        elif choice == "5":
-            min_grade = float(input("Enter minimum GPA: "))
-            max_grade = float(input("Enter maximum GPA: "))
-            gradebook.search_by_grade(min_grade, max_grade)
-        elif choice == "6":
-            student_email = input("Enter student email: ")
+            marks = float(input("Enter marks: "))
+            gradebook.register_student_for_course(student_email, course_name, marks)
+        elif choice == '4':
+            student_email = input("Enter student's email: ")
+            course_name = input("Enter course name: ")
+            gradebook.remove_student_from_course(student_email, course_name)  # New option
+        elif choice == '5':
+            ranking = gradebook.calculate_ranking()
+            print("Student Rankings by Total Marks:")
+            for student in ranking:
+                print(f"{student.names} - Total Marks: {student.total_marks}, GPA: {student.GPA}")
+        elif choice == '6':
+            grade = input("Enter grade to search for: ")
+            students = gradebook.search_by_grade(grade)
+            print("Students with the specified grade:")
+            for student in students:
+                print(f"{student.names} - Email: {student.email}")
+        elif choice == '7':
+            student_email = input("Enter student's email: ")
             gradebook.generate_transcript(student_email)
-        elif choice == "7":
+        elif choice == '8':
             gradebook.display_all_students()
-        elif choice == "8":
-            print("Thank you for using Grade Book! Goodbye!")
+        elif choice == '9':
+            gradebook.save_data('gradebook_data.pkl')
+        elif choice == '10':  # Updated choice number
+            print("Thank you for using Yunis's Grade Book App.")
             break
         else:
             print("Invalid choice. Please try again.")
 
-
 if __name__ == "__main__":
     main()
-
-
-
-
