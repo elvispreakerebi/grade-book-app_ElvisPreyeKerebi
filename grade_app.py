@@ -152,7 +152,7 @@ def main():
 
     while True:
         print("\n>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        print("    Welcome to Yunis App    ")
+        print("    Welcome to Gradebook App    ")
         print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         print("1. Add Student")
         print("2. Add Course")
